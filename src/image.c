@@ -81,8 +81,8 @@ static float bilinear_interpolate(image im, float x, float y, int c)
     float dx = x - ix;
     float dy = y - iy;
 
-    float val = (1-dy) * (1-dx) * get_pixel_extend(im, ix, iy, c) + 
-        dy     * (1-dx) * get_pixel_extend(im, ix, iy+1, c) + 
+    float val = (1-dy) * (1-dx) * get_pixel_extend(im, ix, iy, c) +
+        dy     * (1-dx) * get_pixel_extend(im, ix, iy+1, c) +
         (1-dy) *   dx   * get_pixel_extend(im, ix+1, iy, c) +
         dy     *   dx   * get_pixel_extend(im, ix+1, iy+1, c);
     return val;
@@ -124,7 +124,7 @@ image tile_images(image a, image b, int dx)
     if(a.w == 0) return copy_image(b);
     image c = make_image(a.w + b.w + dx, (a.h > b.h) ? a.h : b.h, (a.c > b.c) ? a.c : b.c);
     fill_cpu(c.w*c.h*c.c, 1, c.data, 1);
-    embed_image(a, c, 0, 0); 
+    embed_image(a, c, 0, 0);
     composite_image(b, c, a.w + dx, 0);
     return c;
 }
@@ -534,8 +534,48 @@ void rgbgr_image(image im)
     }
 }
 
+// #ifdef OPENCV
+// void show_image_cv(image p, const char *name, IplImage *disp)
+// {
+//     int x,y,k;
+//     if(p.c == 3) rgbgr_image(p);
+//     //normalize_image(copy);
+//
+//     char buff[256];
+//     //sprintf(buff, "%s (%d)", name, windows);
+//     sprintf(buff, "%s", name);
+//
+//     int step = disp->widthStep;
+//     cvNamedWindow(buff, CV_WINDOW_NORMAL);
+//     //cvMoveWindow(buff, 100*(windows%10) + 200*(windows/10), 100*(windows%10));
+//     ++windows;
+//     for(y = 0; y < p.h; ++y){
+//         for(x = 0; x < p.w; ++x){
+//             for(k= 0; k < p.c; ++k){
+//                 disp->imageData[y*step + x*p.c + k] = (unsigned char)(get_pixel(p,x,y,k)*255);
+//             }
+//         }
+//     }
+//     if(0){
+//         int w = 448;
+//         int h = w*p.h/p.w;
+//         if(h > 1000){
+//             h = 1000;
+//             w = h*p.w/p.h;
+//         }
+//         IplImage *buffer = disp;
+//         disp = cvCreateImage(cvSize(w, h), buffer->depth, buffer->nChannels);
+//         cvResize(buffer, disp, CV_INTER_LINEAR);
+//         cvReleaseImage(&buffer);
+//     }
+//     cvShowImage(buff, disp);
+// }
+// #endif
+
+// Replace original function in darknet_ros/darknet/src/image.c with below:
+
 #ifdef OPENCV
-void show_image_cv(image p, const char *name, IplImage *disp)
+void show_image_cv(image p, const char *name, IplImage *disp, bool displayDetectedImage)
 {
     int x,y,k;
     if(p.c == 3) rgbgr_image(p);
@@ -546,8 +586,11 @@ void show_image_cv(image p, const char *name, IplImage *disp)
     sprintf(buff, "%s", name);
 
     int step = disp->widthStep;
-    cvNamedWindow(buff, CV_WINDOW_NORMAL); 
+
+    // Commented out b/c YoloObjectDetector takes care of the OpenCV window
+    //cvNamedWindow(buff, CV_WINDOW_NORMAL);
     //cvMoveWindow(buff, 100*(windows%10) + 200*(windows/10), 100*(windows%10));
+
     ++windows;
     for(y = 0; y < p.h; ++y){
         for(x = 0; x < p.w; ++x){
@@ -568,7 +611,9 @@ void show_image_cv(image p, const char *name, IplImage *disp)
         cvResize(buffer, disp, CV_INTER_LINEAR);
         cvReleaseImage(&buffer);
     }
-    cvShowImage(buff, disp);
+    if(displayDetectedImage) {
+      cvShowImage(buff, disp);
+    }
 }
 #endif
 
@@ -578,7 +623,7 @@ void show_image(image p, const char *name)
     IplImage *disp = cvCreateImage(cvSize(p.w,p.h), IPL_DEPTH_8U, p.c);
     image copy = copy_image(p);
     constrain_image(copy);
-    show_image_cv(copy, name, disp);
+    show_image_cv(copy, name, disp, 1);
     free_image(copy);
     cvReleaseImage(&disp);
 #else
@@ -791,7 +836,7 @@ void place_image(image im, int w, int h, int dx, int dy, image canvas)
 
 image center_crop_image(image im, int w, int h)
 {
-    int m = (im.w < im.h) ? im.w : im.h;   
+    int m = (im.w < im.h) ? im.w : im.h;
     image c = crop_image(im, (im.w - m) / 2, (im.h - m)/2, m, m);
     image r = resize_image(c, w, h);
     free_image(c);
@@ -953,7 +998,7 @@ void letterbox_image_into(image im, int w, int h, image boxed)
         new_w = (im.w * h)/im.h;
     }
     image resized = resize_image(im, new_w, new_h);
-    embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2); 
+    embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2);
     free_image(resized);
 }
 
@@ -973,7 +1018,7 @@ image letterbox_image(image im, int w, int h)
     fill_image(boxed, .5);
     //int i;
     //for(i = 0; i < boxed.w*boxed.h*boxed.c; ++i) boxed.data[i] = 0;
-    embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2); 
+    embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2);
     free_image(resized);
     return boxed;
 }
@@ -1239,7 +1284,7 @@ image blend_image(image fore, image back, float alpha)
     for(k = 0; k < fore.c; ++k){
         for(j = 0; j < fore.h; ++j){
             for(i = 0; i < fore.w; ++i){
-                float val = alpha * get_pixel(fore, i, j, k) + 
+                float val = alpha * get_pixel(fore, i, j, k) +
                     (1 - alpha)* get_pixel(back, i, j, k);
                 set_pixel(blend, i, j, k, val);
             }
@@ -1346,7 +1391,7 @@ void saturate_exposure_image(image im, float sat, float exposure)
 
 image resize_image(image im, int w, int h)
 {
-    image resized = make_image(w, h, im.c);   
+    image resized = make_image(w, h, im.c);
     image part = make_image(w, im.h, im.c);
     int r, c, k;
     float w_scale = (float)(im.w - 1) / (w - 1);
@@ -1543,7 +1588,7 @@ image collapse_images_vert(image *ims, int n)
         free_image(copy);
     }
     return filters;
-} 
+}
 
 image collapse_images_horz(image *ims, int n)
 {
@@ -1579,7 +1624,7 @@ image collapse_images_horz(image *ims, int n)
         free_image(copy);
     }
     return filters;
-} 
+}
 
 void show_image_normalized(image im, const char *name)
 {
